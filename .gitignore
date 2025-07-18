@@ -1,0 +1,5 @@
+# IDE Specific
+
+# Build
+bin/Segfaultron
+obj/
