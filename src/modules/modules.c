@@ -1,134 +1,164 @@
 #include "modules/modules.h"
 
+#include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
+#include <dirent.h>
+#include <dlfcn.h>
 
-#include "modules/circus/circus.h"
+#define MODULES_DIR "modules"
+#define EXPORT_SYMBOL "module_export"
 
-/*
- * CREATE AND FREE LIST
- */
+typedef SegfaultronModule *(*ModuleExportFunc)();
 
-SegfaultronModuleList *SegfaultronModules_createList()
+static void insertModule(SegfaultronModuleList *modulesList, SegfaultronModule *module)
 {
-    SegfaultronModuleList *newList = malloc(sizeof(SegfaultronModuleList));
+    module->next = NULL;
 
-    if(newList == NULL)
-    {
-        return NULL;
-    }
-
-    newList->head = NULL;
-    newList->tail = NULL;
-
-    newList->length = 0;
-
-    return newList;
-}
-
-static void SegfaultronModules_clearList(SegfaultronModuleList *modulesList)
-{
-    SegfaultronModule *current = modulesList->head;
-    SegfaultronModule *tmp;
-
-    // Destruction de tous les modules
-    while (current != NULL)
-    {
-        tmp = current->next;
-        current->freeModuleFunction();
-        free(current);
-        current = tmp;
-    }
-    
-    modulesList->head = NULL;
-    modulesList->tail = NULL;
-}
-
-void SegfaultronModules_freeList(SegfaultronModuleList *modulesList)
-{
-    SegfaultronModules_clearList(modulesList);
-    free(modulesList);
-}
-
-/*
- * INSERT MODULE
- */
-
-static void SegfaultronModules_insertModule(SegfaultronModuleList *modulesList, SegfaultronModule *newModule)
-{
     if (modulesList->length == 0)
     {
-        modulesList->head = newModule;
+        modulesList->head = module;
     }
     else
     {
-        modulesList->tail->next = newModule;
+        modulesList->tail->next = module;
     }
-
-    modulesList->tail = newModule;
-    newModule->next = NULL;
-    modulesList->length += 1;
+    modulesList->tail = module;
+    modulesList->length++;
 }
 
-/*
- * LOAD AND RELOAD
- */
-
-void SegfaultronModules_loadModules(SegfaultronModuleList *modulesList)
+SegfaultronModuleList *SegfaultronModules_createList()
 {
-    SegfaultronModules_insertModule(modulesList, circusModule_export());
+    SegfaultronModuleList *modulesList = calloc(1, sizeof(SegfaultronModuleList));
+    return modulesList;
+}
+
+void SegfaultronModules_loadModules(SegfaultronModuleList *list)
+{
+    DIR *dir = opendir(MODULES_DIR);
+    if (dir == NULL)
+    {
+        perror("[ERROR] - [ModuleLoader] Failed to open modules directory");
+        return;
+    }
+
+    struct dirent *entry;
+    while ((entry = readdir(dir)))
+    {
+        if (!strstr(entry->d_name, ".so"))
+        {
+            continue;
+        }
+
+        char path[512];
+        snprintf(path, sizeof(path), "%s/%s", MODULES_DIR, entry->d_name);
+
+        void *handle = dlopen(path, RTLD_NOW | RTLD_GLOBAL);
+        if (handle == NULL) 
+        {
+            fprintf(stderr, "[ERROR] - [ModuleLoader] dlopen failed: %s\n", dlerror());
+            continue;
+        }
+
+        dlerror(); // clear previous error
+        ModuleExportFunc moduleExportFunction = (ModuleExportFunc)dlsym(handle, EXPORT_SYMBOL);
+        const char *err = dlerror();
+        if (err != NULL) {
+            fprintf(stderr, "[ERROR] - [ModuleLoader] dlsym failed: %s\n", err);
+            dlclose(handle);
+            continue;
+        }
+
+        SegfaultronModule *module = moduleExportFunction();
+        if (module == NULL)
+        {
+            fprintf(stderr, "[ModuleLoader] module_export returned NULL\n");
+            dlclose(handle);
+            continue;
+        }
+
+        module->dlHandle = handle;
+        insertModule(list, module);
+
+        if (module->initModuleFunction)
+        {
+            module->initModuleFunction();
+        }
+
+        printf("[INFO] - [ModuleLoader] Loaded: %s\n", module->name);
+    }
+
+    closedir(dir);
 }
 
 void SegfaultronModules_reloadModules(SegfaultronModuleList *modulesList)
 {
-    SegfaultronModule *currentModule = modulesList->head;
-
-    while (currentModule != NULL)
+    for (SegfaultronModule *currentModule = modulesList->head; currentModule != NULL; currentModule = currentModule->next)
     {
-        currentModule->reloadModuleFunction();
-        currentModule = currentModule->next;
+        if (currentModule->reloadModuleFunction) {
+            currentModule->reloadModuleFunction();
+        }
     }
+}
+
+void SegfaultronModules_freeList(SegfaultronModuleList *modulesList) 
+{
+    SegfaultronModule *currentModule = modulesList->head;
+    while (currentModule != NULL) {
+        SegfaultronModule *tmp = currentModule->next;
+
+        if (currentModule->freeModuleFunction)
+        {
+            currentModule->freeModuleFunction();
+        }
+        
+        if (currentModule->dlHandle)
+        {
+            dlclose(currentModule->dlHandle);
+        }
+
+        free(currentModule);
+        currentModule = tmp;
+    }
+    free(modulesList);
 }
 
 void SegfaultronModules_on_interaction_create(SegfaultronModuleList *modulesList, struct discord *client, const struct discord_interaction *event)
 {
-    SegfaultronModule *currentModule = modulesList->head;
-
-    while(currentModule != NULL)
+    for (SegfaultronModule *currentModule = modulesList->head; currentModule != NULL; currentModule = currentModule->next)
     {
-        currentModule->onInteractionCreateFunction(client, event);
-        currentModule = currentModule->next;
+        if (currentModule->onInteractionCreateFunction) {
+            currentModule->onInteractionCreateFunction(client, event);
+        }
     }
 }
 
-void SegfaultronModules_on_message_create(SegfaultronModuleList *modulesList, struct discord *client, const struct discord_message *event)
+void SegfaultronModules_on_message_create(SegfaultronModuleList *modulesList, struct discord *client, const struct discord_message *event) 
 {
-    SegfaultronModule *currentModule = modulesList->head;
-
-    while(currentModule != NULL)
+    for (SegfaultronModule *currentModule = modulesList->head; currentModule != NULL; currentModule = currentModule->next)
     {
-        currentModule->onMessageCreateFunction(client, event);
-        currentModule = currentModule->next;
+        if (currentModule->onMessageCreateFunction) {
+            currentModule->onMessageCreateFunction(client, event);
+        }
     }
 }
 
 void SegfaultronModules_on_message_update(SegfaultronModuleList *modulesList, struct discord *client, const struct discord_message *event)
 {
-    SegfaultronModule *currentModule = modulesList->head;
-
-    while(currentModule != NULL)
+    for (SegfaultronModule *currentModule = modulesList->head; currentModule != NULL; currentModule = currentModule->next)
     {
-        currentModule->onMessageUpdateFunction(client, event);
-        currentModule = currentModule->next;
+        if (currentModule->onMessageUpdateFunction) {
+            currentModule->onMessageUpdateFunction(client, event);
+        }
     }
 }
 
 void SegfaultronModules_on_message_delete(SegfaultronModuleList *modulesList, struct discord *client, const struct discord_message_delete *event)
 {
-    SegfaultronModule *currentModule = modulesList->head;
-
-    while(currentModule != NULL)
+    for (SegfaultronModule *currentModule = modulesList->head; currentModule != NULL; currentModule = currentModule->next)
     {
-        currentModule->onMessageDeleteFunction(client, event);
-        currentModule = currentModule->next;
+        if (currentModule->onMessageDeleteFunction) {
+            currentModule->onMessageDeleteFunction(client, event);
+        }
     }
 }

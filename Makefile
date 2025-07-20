@@ -1,31 +1,31 @@
 CXX = gcc
-CXXFLAGS = -Wall -Wextra -g# Mettre -O1 ou -O2 à la place de -g pour la version prod
 HEADERS_LOCALISATION = include
+CXXFLAGS = -Wall -Wextra -g -I $(HEADERS_LOCALISATION)# Mettre -O1 ou -O2 à la place de -g pour la version prod
 
 LIB_LOCALISATION = lib
-LDFLAGS = -ldiscord -lcurl -lpthread
+LDFLAGS = -L $(LIB_LOCALISATION) -Wl,-rpath,/usr/local/lib -ldiscord -lcurl -lpthread
 
 BIN_LOCALISATION = bin
 EXEC = Segfaultron
 
 SRC_LOCALISATION = src
-OBJS_LOCALISATION = obj
+OBJ_LOCALISATION = obj
 
 SRCS := $(shell find $(SRC_LOCALISATION) -type f -name "*.c")
-OBJS := $(patsubst $(SRC_LOCALISATION)/%.c, $(OBJS_LOCALISATION)/%.o, $(SRCS))
+OBJS := $(patsubst $(SRC_LOCALISATION)/%.c, $(OBJ_LOCALISATION)/%.o, $(SRCS))
 
 all : $(BIN_LOCALISATION)/$(EXEC)
 
 $(BIN_LOCALISATION)/$(EXEC) : $(OBJS)
 	mkdir -p $(BIN_LOCALISATION)
-	$(CXX) -L $(LIB_LOCALISATION) $^ -o $@ $(LDFLAGS)
+	$(CXX) $^ -o $@ $(LDFLAGS)
 
-$(OBJS_LOCALISATION)/%.o: $(SRC_LOCALISATION)/%.c
+$(OBJ_LOCALISATION)/%.o: $(SRC_LOCALISATION)/%.c
 	mkdir -p $(dir $@)
-	$(CXX) $(CXXFLAGS) -I $(HEADERS_LOCALISATION) -c $< -o $@
+	$(CXX) $(CXXFLAGS) -c $< -o $@
 
 clean:
-	rm -rf $(OBJS_LOCALISATION)
+	rm -rf $(OBJ_LOCALISATION)
 
 mrproper: clean
 	rm -f $(BIN_LOCALISATION)/$(EXEC) $(BIN_LOCALISATION)/*.log

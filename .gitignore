@@ -3,4 +3,10 @@
 
 # Build
 bin/Segfaultron
+bin/modules/*.so
+bin/*.log
+
 obj/
+
+# Modules
+modules/**/*.so
