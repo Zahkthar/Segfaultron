@@ -1,7 +1,7 @@
+#include "circus.h"
+
 #include <stdio.h>
 #include <stdlib.h>
-
-#include "circus.h"
 
 static void initModule()
 {
