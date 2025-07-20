@@ -1,7 +1,7 @@
 MODULE_NAME = circus
 
 CXX = gcc
-INCLUDE_MAIN = ../../include
+INCLUDE_MAIN = ../../segfaultron/include
 HEADERS_LOCALISATION = include
 CXXFLAGS = -Wall -Wextra -g -fPIC -I$(HEADERS_LOCALISATION) -I$(INCLUDE_MAIN)
 
@@ -11,14 +11,16 @@ LDFLAGS = -L $(LIB_LOCALISATION) -shared -ldiscord
 SRC_LOCALISATION = src
 OBJ_LOCALISATION = obj
 
+BIN_LOCALISATION = bin
 OUT_FILE = $(MODULE_NAME).so
 
 SRCS = $(wildcard $(SRC_LOCALISATION)/*.c)
 OBJS = $(patsubst $(SRC_LOCALISATION)/%.c,$(OBJ_LOCALISATION)/%.o,$(SRCS))
 
-all: $(OUT_FILE)
+all: $(BIN_LOCALISATION)/$(OUT_FILE)
 
-$(OUT_FILE): $(OBJS)
+$(BIN_LOCALISATION)/$(OUT_FILE): $(OBJS)
+	mkdir -p $(BIN_LOCALISATION)
 	$(CXX) $^ -o $@ $(LDFLAGS)
 
 $(OBJ_LOCALISATION)/%.o: $(SRC_LOCALISATION)/%.c
@@ -26,6 +28,6 @@ $(OBJ_LOCALISATION)/%.o: $(SRC_LOCALISATION)/%.c
 	$(CXX) $(CXXFLAGS) -c $< -o $@
 
 clean:
-	rm -rf $(OBJ_LOCALISATION) $(OUT_FILE)
+	rm -rf $(OBJ_LOCALISATION) $(BIN_LOCALISATION)
 
 .PHONY: all clean

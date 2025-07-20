@@ -1,33 +1,39 @@
-CXX = gcc
-HEADERS_LOCALISATION = include
-CXXFLAGS = -Wall -Wextra -g -I $(HEADERS_LOCALISATION)# Mettre -O1 ou -O2 à la place de -g pour la version prod
+# Search for all folder in modules with a Makefile --> The modules
+MODULE_DIRS := $(shell find . modules -mindepth 1 -maxdepth 1 -type d -exec test -f '{}/Makefile' ';' -print | sed 's|^\./||')
 
-LIB_LOCALISATION = lib
-LDFLAGS = -L $(LIB_LOCALISATION) -Wl,-rpath,/usr/local/lib -ldiscord -lcurl -lpthread
+BUILD_DIR := build
+BUILD_MODULES_DIR := $(BUILD_DIR)/modules
 
-BIN_LOCALISATION = bin
-EXEC = Segfaultron
+all:
+	@echo "Building modules: $(MODULE_DIRS)"
+	@for dir in $(MODULE_DIRS); do \
+		$(MAKE) -C $$dir || exit 1; \
+	done
 
-SRC_LOCALISATION = src
-OBJ_LOCALISATION = obj
-
-SRCS := $(shell find $(SRC_LOCALISATION) -type f -name "*.c")
-OBJS := $(patsubst $(SRC_LOCALISATION)/%.c, $(OBJ_LOCALISATION)/%.o, $(SRCS))
-
-all : $(BIN_LOCALISATION)/$(EXEC)
-
-$(BIN_LOCALISATION)/$(EXEC) : $(OBJS)
-	mkdir -p $(BIN_LOCALISATION)
-	$(CXX) $^ -o $@ $(LDFLAGS)
-
-$(OBJ_LOCALISATION)/%.o: $(SRC_LOCALISATION)/%.c
-	mkdir -p $(dir $@)
-	$(CXX) $(CXXFLAGS) -c $< -o $@
+	@echo "Copying built files..."
+	@mkdir -p $(BUILD_MODULES_DIR)
+	@for dir in $(MODULE_DIRS); do \
+		if [ -d $$dir/bin ]; then \
+			for file in $$dir/bin/*; do \
+				if [ -f $$file ]; then \
+					case $$file in \
+						*.so) cp $$file $(BUILD_MODULES_DIR)/ ;; \
+						*) cp $$file $(BUILD_DIR)/ ;; \
+					esac \
+				fi \
+			done \
+		fi \
+	done
 
 clean:
-	rm -rf $(OBJ_LOCALISATION)
+	@echo "Cleaning modules: $(MODULE_DIRS)"
+	@for dir in $(MODULE_DIRS); do \
+		$(MAKE) -C $$dir clean || exit 1; \
+	done
 
-mrproper: clean
-	rm -f $(BIN_LOCALISATION)/$(EXEC) $(BIN_LOCALISATION)/*.log
+	@echo "Cleaning build directory"
+	@if [ -d $(BUILD_DIR) ]; then \
+		find $(BUILD_DIR) -mindepth 1 ! -name 'config.json' -exec rm -rf {} +; \
+	fi
 
-.PHONY: all program clean mrproper
+.PHONY: all clean

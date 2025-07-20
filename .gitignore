@@ -2,11 +2,12 @@
 .vscode/
 
 # Build
-bin/Segfaultron
-bin/modules/*.so
-bin/*.log
+build/
 
-obj/
+# Segfaultron
+segfaultron/bin/
+segfaultron/obj/
 
 # Modules
-modules/**/*.so
+modules/**/bin/
+modules/**/obj/
