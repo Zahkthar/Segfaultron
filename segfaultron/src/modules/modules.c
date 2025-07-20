@@ -33,7 +33,7 @@ SegfaultronModuleList *SegfaultronModules_createList()
     return modulesList;
 }
 
-void SegfaultronModules_loadModules(SegfaultronModuleList *list)
+void SegfaultronModules_loadModules(SegfaultronModuleList *list, struct discord *client, u64snowflake app_id)
 {
     DIR *dir = opendir(MODULES_DIR);
     if (dir == NULL)
@@ -82,23 +82,13 @@ void SegfaultronModules_loadModules(SegfaultronModuleList *list)
 
         if (module->initModuleFunction)
         {
-            module->initModuleFunction();
+            module->initModuleFunction(client, app_id);
         }
 
         printf("[INFO] - [ModuleLoader] Loaded: %s\n", module->name);
     }
 
     closedir(dir);
-}
-
-void SegfaultronModules_reloadModules(SegfaultronModuleList *modulesList)
-{
-    for (SegfaultronModule *currentModule = modulesList->head; currentModule != NULL; currentModule = currentModule->next)
-    {
-        if (currentModule->reloadModuleFunction) {
-            currentModule->reloadModuleFunction();
-        }
-    }
 }
 
 void SegfaultronModules_freeList(SegfaultronModuleList *modulesList) 

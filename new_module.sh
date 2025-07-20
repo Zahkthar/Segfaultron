@@ -17,7 +17,7 @@ cat > "$BASE_DIR/src/$MODULE.c" << EOF
 #include <stdio.h>
 #include <stdlib.h>
 
-static void initModule()
+static void initModule(struct discord *client, u64snowflake app_id)
 {
     puts("[INFO] - [$MODULE] Module initialized");
 }

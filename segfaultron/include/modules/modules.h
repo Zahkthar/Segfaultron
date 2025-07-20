@@ -9,8 +9,7 @@
 typedef struct SegfaultronModule {
     char *name;
 
-    void (*initModuleFunction)();
-    void (*reloadModuleFunction)();
+    void (*initModuleFunction)(struct discord *client, u64snowflake app_id);
     void (*freeModuleFunction)();
 
     // Module logic functions
@@ -33,8 +32,7 @@ typedef struct SegfaultronModuleList {
 SegfaultronModuleList *SegfaultronModules_createList();
 
 void SegfaultronModules_freeList     (SegfaultronModuleList *list);
-void SegfaultronModules_loadModules  (SegfaultronModuleList *list);
-void SegfaultronModules_reloadModules(SegfaultronModuleList *list);
+void SegfaultronModules_loadModules  (SegfaultronModuleList *list, struct discord *client, u64snowflake app_id);
 
 void SegfaultronModules_on_interaction_create(SegfaultronModuleList *, struct discord *, const struct discord_interaction *);
 void SegfaultronModules_on_message_create    (SegfaultronModuleList *, struct discord *, const struct discord_message *);

@@ -12,6 +12,40 @@ u64snowflake g_app_id;
 
 SegfaultronModuleList *modulesList = NULL;
 
+void on_commands_fetched(struct discord *client, struct discord_response *resp, const struct discord_application_commands *ret)
+{
+    (void)resp;
+    if (!ret || !ret->array)
+    {
+        SegfaultronModules_loadModules(modulesList, client, g_app_id);
+        return;
+    }
+
+    for (int i = 0; i < ret->size; ++i)
+    {
+        printf("[INFO] - [Main] - Supression de la commande %s\n", ret->array[i].name);
+        discord_delete_global_application_command(client, g_app_id, ret->array[i].id, NULL);
+    }
+
+    SegfaultronModules_loadModules(modulesList, client, g_app_id);
+}
+
+void clearGlobalCommands(struct discord *client)
+{
+    struct discord_ret_application_commands ret =
+    {
+        .done = &on_commands_fetched,
+        .fail = NULL,
+        .cleanup = NULL,
+        .data = NULL,
+        .keep = NULL,
+        .high_priority = false,
+        .sync = NULL,
+    }; 
+    discord_get_global_application_commands(client, g_app_id, &ret);
+}
+
+
 void on_ready(struct discord *client, const struct discord_ready *event)
 {
     (void)client;
@@ -19,7 +53,7 @@ void on_ready(struct discord *client, const struct discord_ready *event)
     log_info("[INFO] Segfaultron connected as %s#%s!", event->user->username, event->user->discriminator);
     g_app_id = event->application->id;
 
-    SegfaultronModules_loadModules(modulesList);
+    clearGlobalCommands(client);
 }
 
 void on_interaction_create(struct discord *client, const struct discord_interaction *event)
